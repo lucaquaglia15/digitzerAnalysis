@@ -1,5 +1,7 @@
+//Root & C++ classes
 #include "TTree.h"
 #include "TBranch.h"
+#include "TSystem.h"
 
 #include "TH1F.h"
 #include "TH2F.h"
@@ -14,7 +16,7 @@
 #include <TStyle.h>
 #include "TString.h"
 #include "TFile.h"
-#include "TSystem.h"
+
 #include "TAxis.h"
 #include <iostream>
 #include <vector>
@@ -24,10 +26,19 @@
 #include <numeric>
 #include <map>
 #include "Fit/FitResult.h"
+#include <array>
 
+//My classes
 #include "utilities.h"
 
 using namespace std;
+
+const string txtExt = ".txt"; //txt extension
+const string rootExt = ".root"; //root extension
+const string folder = "/home/luca/cernbox/PhD/digitizer904/test500events/Scan_000178/HV1_DIGITIZER/"; //folder with data
+const string trig = "TR_0_"; //digitized trigger file name
+const string wave = "wave_"; //file name + number from 0 to 15 for the strip number
+bool verbose = true;
 
 void analyzeDigitizer() {
 
@@ -36,11 +47,23 @@ void analyzeDigitizer() {
 	//From struct in .h file
 	struct chamber testedDetector;
 
+	//Info on the chamber
 	cout << "Detector: " << testedDetector.name << endl;
 	cout << "Number of strips: " << testedDetector.stripNum << endl;
+	int readoutStrips = *(&testedDetector.strips + 1) - testedDetector.strips;
+	cout << "Number of strips readout: " << readoutStrips << endl;
 	cout << "Sampling frequency: " << testedDetector.sampFreq << "Gs/s" << endl;
 	cout << "Number of samples: " << testedDetector.numSamp << endl;
 
+	//Convert .txt files in .root
 	cout << "Converting .txt data in .root format..." << endl;
+	//gSystem->cd(folder.c_str());
+
+	//Call tree producer function
+	treeProducer(readoutStrips,folder,trig,wave);
+
+	//Call the conversion function from ADC counts to mV
+
+
 
 }
