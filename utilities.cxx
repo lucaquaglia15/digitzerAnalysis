@@ -33,6 +33,9 @@ void treeProducer (int numFiles, string folderPath, string trigFile, string wave
 			cout << "Opening file: " << fileName << endl;
 			string tp; 
 			while(getline(dataFile,tp)) {
+
+				//if (fileName == )
+
 				if (lineCounter % 1032 == 4) {
 					//cout << tp << endl; //Event number
 				}
