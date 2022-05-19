@@ -8,46 +8,54 @@ void treeProducer (int numFiles, string folderPath, string trigFile, string wave
 	TFile *fData = new TFile("digitizerData.root","RECREATE"); //root file to save data
 	TTree *dataTree = new TTree("dataTree","Data from digitizer"); //tree
 
-	int evNum = 0;
-	double count[8][1024];
-	// = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-
-	dataTree->Branch("evNum",&evNum,"evNum/I");
+	//int evNum = 0;
+	//double count[8][1024];
+	double count[1024];
+	//double count[8] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 
 	string fileName; //Name of the input file
 
 	for (int i = 0; i < numFiles; i++) {
+		int evNum = 0;
 		int j = 0, lineCounter = 1;
 		fstream dataFile; //For txt input file -> to stream data
 		string branchName = "counts_strip_" + to_string(i);
 		//TBranch *branch = new TBranch (dataTree, branchName.c_str(),&count,"count/D",32000);
-		TBranch *branch = dataTree->Branch(branchName.c_str(),&count[i][j]);
+		//TBranch *branch = dataTree->Branch(branchName.c_str(),&count[i][j]); -> this works
+		TBranch *branch = dataTree->Branch(branchName.c_str(),count,"count/D");
 		//dataTree->Branch(branchName.c_str(),&count[i]);
 		//dataTree->Branch(branchName.c_str(),count+i);
-		cout << &count[i][j] << endl;
+		//cout << &count[i][j] << endl;
 		fileName = waveFile + to_string(i) + ".txt";
 		//fileName = "wave_0.txt";
 		dataFile.open(fileName.c_str());
+		if (fileName == "wave_0.txt") dataTree->Branch("evNum",&evNum,"evNum/I");
 
 		if (dataFile.is_open()) { //Open file and parse useful information to put in .root file
 			cout << "Opening file: " << fileName << endl;
-			string tp; 
+			string tp = ""; 
 			while(getline(dataFile,tp)) {
 
-				//if (fileName == )
+				/*if (fileName == "wave_0.txt" && lineCounter % 1032 == 4) {
+					cout << tp.substr(tp.find(": ") + 1) << endl; 
+					evNum = stoi(tp.substr(tp.find(": ") + 1));
+					dataTree->Fill();
+				//cout << tp << endl; //Event number
+				}*/
 
-				if (lineCounter % 1032 == 4) {
-					//cout << tp << endl; //Event number
-				}
-				else if ((lineCounter % 1032 >= 9 && lineCounter % 1032 <= 1031) || (lineCounter % 1032 == 0)) {
+				/*else*/ if ((lineCounter % 1032 >= 9 && lineCounter % 1032 <= 1031) || (lineCounter % 1032 == 0)) {
 					//cout << tp << endl;
-					count[i][j] = stod(tp);
+					//count[i][j] = stod(tp);
+					count[j] = stod(tp);
+					//cout << count[j] << endl;
 					j++;
+					cout << j << endl;
 					//cout << count + i << endl;
 					//dataTree->Fill();
 					//branch->Fill();
 					if (j == 1023) {
 						dataTree->Fill();
+						//branch->Fill();
 						j = 0;
 					}
 					//cout << count[i] << endl;
@@ -57,13 +65,15 @@ void treeProducer (int numFiles, string folderPath, string trigFile, string wave
 				//dataTree->Fill(); //Fill tree branches
 				//branch->Fill();
 			}
-			dataFile.close();
+			//dataFile.close();
 		} 
 
 		else { //File opening not succesful, close the program
 			cout << "Error in opening wave file" << endl;
 			exit(0);
 		}
+
+		dataFile.close();
 
 		//dataFile.close();
 		//fData->cd();
