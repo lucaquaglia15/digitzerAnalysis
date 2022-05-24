@@ -29,6 +29,6 @@ struct chamberEPDT { //EPDT digitizer
 
 void treeProducer(int numFiles, string folderPath, string trigFile, string waveFile);
 
-void countsConverter();
+void analyzer();
 
 #endif

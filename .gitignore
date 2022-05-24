@@ -1,3 +1,8 @@
 *.d
 *.so
 *.pcm
+*dict.cxx
+*linkdef.h
+*.in
+*.out
+*mainC

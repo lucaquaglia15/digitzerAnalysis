@@ -36,6 +36,7 @@ using namespace std;
 const string txtExt = ".txt"; //txt extension
 const string rootExt = ".root"; //root extension
 const string folder = "/home/luca/cernbox/PhD/digitizer904/test500events/Scan_000178/HV1_DIGITIZER/"; //folder with data
+//const string folder = "/home/luca/cernbox/PhD/digitizer904/000"; //folder with data
 const string trig = "TR_0_"; //digitized trigger file name
 const string wave = "wave_"; //file name + number from 0 to 15 for the strip number
 bool verbose = true;
@@ -60,9 +61,11 @@ void analyzeDigitizer() {
 	//gSystem->cd(folder.c_str());
 
 	//Call tree producer function
+	//gSystem->cd();
 	treeProducer(readoutStrips,folder,trig,wave);
 
-	//Call the conversion function from ADC counts to mV
+	//Call the analyzer function
+	analyzer();
 
 
 
