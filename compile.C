@@ -20,6 +20,7 @@ void compile(TString myopt="fast"){
 
   gSystem->CompileMacro("utilities.cxx",opt.Data());//compile classes and libraries
   gSystem->CompileMacro("analyzeDigitizer.C",opt.Data());//compile classes and libraries
-  gROOT->ProcessLine("analyzeDigitizer()");//perform generation
-
-}
+  gROOT->ProcessLine("analyzeDigitizer(182)");//perform generation
+  
+  printf("\n\n+++ DIGITIZER END +++\n\n");
+}  

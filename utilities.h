@@ -6,6 +6,7 @@
 #include "TFile.h"
 #include "TSystem.h"
 #include "Riostream.h"
+#include "TString.h"
 #include <stdlib.h>
 #include <fstream>
 
@@ -27,8 +28,10 @@ struct chamberEPDT { //EPDT digitizer
 	float sampFreq = 2.5; //Gs/s
 };
 
-void treeProducer(int numFiles, string folderPath, string trigFile, string waveFile);
+void treeProducer(int numFiles, string folderPath, string trigFile, string waveFile, int hv, bool verbose);
 
-void analyzer();
+int hvCounter(string folderPath, string ext, bool verbose);
+
+void analyzer(string folderPath, int hv, bool verbose);
 
 #endif
