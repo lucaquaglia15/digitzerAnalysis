@@ -38,14 +38,16 @@ const string rootExt = ".root"; //root extension
 const string folder = "/home/luca/cernbox/PhD/digitizer904/000"; //folder with data
 const string trig = "TR_0_"; //digitized trigger file name
 const string wave = "wave_"; //file name + number from 0 to 15 for the strip number
-bool verbose = true;
+const int muonMin = 150, muonMax = 250;
+const int noiseMin = 400, noiseMax = 600;
+bool verbose = false; //true = prints debug, false = no printout
 
 void analyzeDigitizer(const int run) {
 
 	cout << "Starting digitizer data analysis!" << endl;
 
 	//From struct in .h file
-	struct chamber testedDetector;
+	struct chamber1G testedDetector;
 
 	//Info on the chamber
 	cout << "Detector: " << testedDetector.name << endl;
@@ -70,8 +72,28 @@ void analyzeDigitizer(const int run) {
     for (int i = 0; i < file_count; i++) {
     	string hvPoint = scanFolder + "HV" + to_string(i+1) + "_DIGITIZER";
     	//Produce tree
-    	treeProducer(readoutStrips,hvPoint,trig,wave,i,verbose);
-    	//Analyze data
-    	analyzer(hvPoint,i,verbose);
+    	//treeProducer(readoutStrips,hvPoint,trig,wave,i,verbose);
     }
+
+    vector<double> eff, hvEff;
+
+    for (int i = 0; i < file_count; i++) {
+    	string hvPoint = scanFolder + "HV" + to_string(i+1) + "_DIGITIZER";
+    	eff.push_back(analyzer(readoutStrips,hvPoint,i,verbose,testedDetector, muonMin, muonMax, noiseMin, noiseMax));
+    }
+
+    //Read hv effective from .root CAEN file
+    hvEff = hvReader(scanFolder, rootExt, file_count, verbose);
+
+
+    //Plot efficiency(HV) curve
+    TCanvas *cEff = new TCanvas();
+    cEff->cd();
+
+    TGraphErrors *effHv = new TGraphErrors(eff.size(),&hvEff[0],&eff[0],NULL,NULL);
+    effHv->SetMarkerStyle(8);
+    effHv->SetMarkerSize(1);
+    effHv->GetXaxis()->SetTitle("HV_{eff} [V]");
+    effHv->GetYaxis()->SetTitle("Eff [%]");
+    effHv->Draw("AP");
 }
