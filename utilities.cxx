@@ -108,7 +108,8 @@ int hvCounter(string folderPath, string ext, bool verbose) {
 //                    //
 //--------------------//
 
-double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) {
+double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { //1 Gs/s
+//double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { // 5 Gs/s
 
 	cout << endl << "Analyzing HV value: " << hv+1 << endl;
 
@@ -126,14 +127,16 @@ double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G
 	gSystem->cd(folderPath.c_str());
 
 	TFile *fout = new TFile(("HV_" + to_string(hv+1) + "_ANALYSIS.root").c_str(),"RECREATE");
-	TDirectory *dirEff = fout->mkdir("efficientEvents");
-	TDirectory *dirNonEff = fout->mkdir("nonEfficientEvents");
+	TDirectory *dirEff = fout->mkdir("efficientEvents"); //Efficient muon events display
+	TDirectory *dirNonEff = fout->mkdir("nonEfficientEvents"); //Non efficient muon events display
+	TDirectory *dirEffGamma = fout->mkdir("gammaEfficientEvents"); //Efficient gamma events display
+	TDirectory *dirNonEffGamma = fout->mkdir("gammaNonEfficientEvents");//Non efficient gamma events display
 
 	TFile *f = new TFile(("digitizerData_HV_" + to_string(hv+1) + ".root").c_str(),"READ");
 	TTree *t = (TTree*)f->Get("dataTree");
 
 	int nEntries = t->GetEntries();
-	//if (verbose) cout << "Number of entries in the tree: " << nEntries << endl; //Debug
+	cout << "Number of entries in the tree: " << nEntries << endl; //Debug
 
 	if (verbose) cout << rpc.numSamp << endl;
 
@@ -179,14 +182,17 @@ double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G
 	// 1) Get tree entries
 	for (int i = 0; i < nEntries; i++) { //cycle on all the events
 		//if (i == 0) {
+		if (verbose) cout << "Entry: " << i << endl;
 			
 			t->GetEntry(i); //Get i-th entry
 			//cout << data[0]->size() << endl;
 
-			if (*min_element(&data[0]->begin, &data[0]->end()) < 1000) { //It's a muon 
+			//cout << *min_element(data[0]->begin(), data[0]->end()) << endl;
+
+			if (*min_element(data[0]->begin(), data[0]->end()) < 1000.) { //It's a muon - 1 Gs/s, if 5 Gs/s comment this line
 				muonCounter++;
 
-				for (int j = 0; j < numFiles; j++) {
+				for (int j = 0; j < numFiles; j++) { //Channel 0 excluded because it's the trigger only
 					//Conversion to mV 
 					/*for (unsigned int k = 0; k < data[0]->size(); k++) {
 						//datamV[i].push_back(data[j]->at(k) * ); //CONVERSION HERE
@@ -209,6 +215,8 @@ double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G
 					gStrip[j]->SetTitle("");
 					cStrip->cd(j+1);
 					gStrip[j]->Draw("APL");
+
+					if (j == 0) continue;
 
 					meanNoise = accumulate(&data[j]->at(noiseMin), &data[j]->at(noiseMax), 0.0) / (noiseMax-noiseMin);
 
@@ -240,8 +248,8 @@ double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G
 			}
 
 			else { //It's a rate event, for the moment we ignore it
-				rateCounter ++;
-				break; 
+				rateCounter++;
+				continue; 
 			}
 		//}
 
@@ -266,7 +274,7 @@ double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G
 
 	fout->Close();
 
-	cout << "Efficient events: " << eventsWitHit << " non efficient :" << eventsWtihoutHit << " efficiency: " << eventsWitHit/(double)muonCounter << endl;
+	cout << "Muon counter: " << muonCounter << " efficient events: " << eventsWitHit << " non efficient :" << eventsWtihoutHit << " efficiency: " << eventsWitHit/(double)muonCounter << endl;
 
 	return (eventsWitHit/(double)muonCounter)*100;
 }
@@ -277,18 +285,23 @@ double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G
 //                    //
 //--------------------//
 
-vector <double> hvReader(string scanFolder, string rootExt, int file_count, bool verbose) {
+vector <double> hvReader(string scanFolder, int scan, int file_count, bool verbose) {
 
 	vector<double> hvEff;
 
 	gSystem->cd(scanFolder.c_str());
 
 	for (int i = 0; i < file_count; i++) {
-		TFile *f = new TFile(("Scan000220_HV" + to_string(i+1) +"_CAEN.root").c_str(),"READ");
-		TH1F *HVeff = (TH1F*)f->Get("HVeff_ALICE-2-0-GAP");
-		TH1F *HVmon = (TH1F*)f->Get("HVmon_ALICE-2-0-GAP");
-		TH1F *Imon = (TH1F*)f->Get("Imon_ALICE-2-0-GAP");
-		hvEff.push_back(HVeff->GetMean());
+		
+		if (i != 7) {
+			TFile *f = new TFile(("Scan000" + to_string(scan) + "_HV" + to_string(i+1) +"_CAEN.root").c_str(),"READ");
+			TH1F *HVeff = (TH1F*)f->Get("HVeff_ALICE-2-0-GAP");
+			TH1F *HVmon = (TH1F*)f->Get("HVmon_ALICE-2-0-GAP");
+			TH1F *Imon = (TH1F*)f->Get("Imon_ALICE-2-0-GAP");
+			hvEff.push_back(HVeff->GetMean());
+		}
+		
+		else hvEff.push_back(9500); //Specific for scan 243, hv point 8 .root file was produced
 	}
 	return hvEff;
 }
