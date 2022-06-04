@@ -43,7 +43,7 @@ const int muonMin = 150, muonMax = 250; //1 Gs/s
 //Time window at 5 Gs/s = 70-100 ns
 const int noiseMin = 50, noiseMax = 100; //1 Gs/s
 //const int noiseMin = 100, noiseMax = 200; //5 Gs/s - time for noise 140-180 ns -> now 20 - 40 ns
-bool verbose = false; //true = prints debug, false = no printout
+bool verbose = true; //true = prints debug, false = no printout
 
 void analyzeDigitizer(const int run) {
 
@@ -117,9 +117,9 @@ void analyzeDigitizer(const int run) {
     currHv->GetYaxis()->SetRangeUser(curr.front() - 0.1*curr.front(),curr.back() + 0.1*curr.back());
     currHv->Draw("AP");*/
 
-    TFile *fAnalysisOut = new TFile(("Analysis_run_"+to_string(run)).c_str(),"RECREATE");
+    TFile *fAnalysisOut = new TFile(("Analysis_run_"+to_string(run)+".root").c_str(),"RECREATE");
     fAnalysisOut->cd();
-    cEff->Write(("Efficiency_run_"+to_string(run)+".root").c_str());
+    cEff->Write(("Efficiency_run_"+to_string(run)).c_str());
     //cCurr->Write("Current_run_"+to_string(run));
     fAnalysisOut->Close();
 }

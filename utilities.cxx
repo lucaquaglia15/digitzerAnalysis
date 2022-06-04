@@ -25,7 +25,7 @@ void treeProducer(int numFiles, string folderPath, string trigFile, string waveF
 		dataTree->Branch(branchName.c_str(), &counts[i]);
 		if (verbose) cout << &(counts[i]) << endl;
 	}
-
+	string tp = ""; //new position
 	for (int i = 0; i < 8; i++) {
 
 		fstream dataFile; //For txt input file -> to stream data
@@ -34,7 +34,7 @@ void treeProducer(int numFiles, string folderPath, string trigFile, string waveF
 
 		if (dataFile.is_open()) { //Open file and parse useful information to put in .root file
 			if (verbose) cout << "Opening file: " << fileName << endl;
-			string tp = ""; 
+			//string tp = ""; //old position
 
 			while(getline(dataFile,tp)) {
 				strip.push_back(tp);
@@ -58,6 +58,20 @@ void treeProducer(int numFiles, string folderPath, string trigFile, string waveF
 	int counter = 0;
 
 	if (verbose) cout << data[0].size() << endl;
+
+	/*for (unsigned int i = 0; i < data[0].size(); i++) {
+		if ((i % 1032 >= 8 && i % 1032 <= 1031)) { //ADC data
+			for (int j = 0; j < 8; j++) {
+				counts[j].push_back(stod(data[j][i]));
+				counter++;
+				if (counter == 1024*8) { //event finished
+					dataTree->Fill();
+					counter = 0;
+					for (unsigned k = 0; k < 8; k++) counts[k].clear();
+				}
+			}
+		}
+	}*/ //WORKING VERSION!!!
 
 	for (unsigned int i = 0; i < data[0].size(); i++) {
 		if ((i % 1032 >= 8 && i % 1032 <= 1031)) { //ADC data
@@ -293,15 +307,14 @@ vector <double> hvReader(string scanFolder, int scan, int file_count, bool verbo
 
 	for (int i = 0; i < file_count; i++) {
 		
-		if (i != 7) {
 			TFile *f = new TFile(("Scan000" + to_string(scan) + "_HV" + to_string(i+1) +"_CAEN.root").c_str(),"READ");
 			TH1F *HVeff = (TH1F*)f->Get("HVeff_ALICE-2-0-GAP");
 			TH1F *HVmon = (TH1F*)f->Get("HVmon_ALICE-2-0-GAP");
 			TH1F *Imon = (TH1F*)f->Get("Imon_ALICE-2-0-GAP");
 			hvEff.push_back(HVeff->GetMean());
-		}
 		
-		else hvEff.push_back(9500); //Specific for scan 243, hv point 8 .root file was produced
+		
+		//else hvEff.push_back(9500); //Specific for scan 243, hv point 8 .root file was produced
 	}
 	return hvEff;
 }
