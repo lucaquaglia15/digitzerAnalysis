@@ -22,7 +22,7 @@ void compile(TString myopt="fast"){
   gSystem->CompileMacro("SGSmooth.cpp",opt.Data());//compile classes and libraries
   gSystem->CompileMacro("utilities.cxx",opt.Data());//compile classes and libraries
   gSystem->CompileMacro("analyzeDigitizer.C",opt.Data());//compile classes and libraries
-  gROOT->ProcessLine("analyzeDigitizer(227,false)");//perform analysis of data
+  gROOT->ProcessLine("analyzeDigitizer(239,false)");//perform analysis of data
   
   printf("\n\n+++ DIGITIZER END +++\n\n");
 }  
