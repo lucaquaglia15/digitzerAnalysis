@@ -18,9 +18,11 @@ void compile(TString myopt="fast"){
     opt = "kg";
   }
 
+  gSystem->CompileMacro("PeakFinder.cpp",opt.Data());//compile classes and libraries
+  gSystem->CompileMacro("SGSmooth.cpp",opt.Data());//compile classes and libraries
   gSystem->CompileMacro("utilities.cxx",opt.Data());//compile classes and libraries
   gSystem->CompileMacro("analyzeDigitizer.C",opt.Data());//compile classes and libraries
-  gROOT->ProcessLine("analyzeDigitizer(271)");//perform generation
+  gROOT->ProcessLine("analyzeDigitizer(227,false)");//perform analysis of data
   
   printf("\n\n+++ DIGITIZER END +++\n\n");
 }  
