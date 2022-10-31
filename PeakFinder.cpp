@@ -7,255 +7,6 @@
 #include <cmath>
 #include <numeric>
 
-void diff(std::vector<float> in, std::vector<float>& out)
-{
-	out = std::vector<float>(in.size()-1);
-
-	for(unsigned int i=1; i<in.size(); ++i)
-		out[i-1] = in[i] - in[i-1];
-}
-
-void vectorElementsProduct(std::vector<float> a, std::vector<float> b, std::vector<float>& out)
-{
-	out = std::vector<float>(a.size());
-
-	for(unsigned int i=0; i<a.size(); ++i)
-		out[i] = a[i] * b[i];
-}
-
-void findIndicesLessThan(std::vector<float> in, float threshold, std::vector<int>& indices)
-{
-	for(unsigned int i=0; i<in.size(); ++i)
-		if(in[i]<threshold)
-			indices.push_back(i+1);
-}
-
-void selectElementsFromIndices(std::vector<float> in, std::vector<int> indices, std::vector<float>& out)
-{
-	for(unsigned int i=0; i<indices.size(); ++i)
-		out.push_back(in[indices[i]]);
-}
-
-void selectElementsFromIndices(std::vector<int> in, std::vector<int> indices, std::vector<int>& out)
-{
-	for(unsigned int i=0; i<indices.size(); ++i)
-		out.push_back(in[indices[i]]);
-}
-
-void signVector(std::vector<float> in, std::vector<int>& out)
-{
-	out = std::vector<int>(in.size());
-
-	for(unsigned int i=0; i<in.size(); ++i)
-	{
-		if(in[i]>0)
-			out[i]=1;
-		else if(in[i]<0)
-			out[i]=-1;
-		else
-			out[i]=0;
-	}
-}
-
-void scalarProduct(float scalar, std::vector<float> in, std::vector<float>& out)
-{
-	out = std::vector<float>(in.size());
-
-	for(unsigned int i=0; i<in.size(); ++i)
-		out[i] = scalar * in[i];
-}
-
-/*void PeakFinder::findPeaks(std::vector<float> x0, std::vector<int>& peakInds, bool includeEndpoints, float extrema)
-{
-	int minIdx = distance(x0.begin(), min_element(x0.begin(), x0.end()));
-	int maxIdx = distance(x0.begin(), max_element(x0.begin(), x0.end()));
-
-	float sel = (x0[maxIdx]-x0[minIdx])/4.0;
-	int len0 = x0.size();
-
-	scalarProduct(extrema, x0, x0);
-
-	std::vector<float> dx;
-	diff(x0, dx);
-	replace(dx.begin(), dx.end(), 0.0f, -PeakFinder::EPS);
-	std::vector<float> dx0(dx.begin(), dx.end()-1);
-	std::vector<float> dx0_1(dx.begin()+1, dx.end());
-	std::vector<float> dx0_2;
-
-	vectorElementsProduct(dx0, dx0_1, dx0_2);
-
-	std::vector<int> ind;
-	findIndicesLessThan(dx0_2, 0, ind); // Find where the derivative changes sign	
-	std::vector<float> x;
-	float leftMin;
-	int minMagIdx;
-	float minMag;
-	
-	if(includeEndpoints)
-	{
-		//x = [x0(1);x0(ind);x0(end)];	
-		selectElementsFromIndices(x0, ind, x);		
-		x.insert(x.begin(), x0[0]);
-		x.insert(x.end(), x0[x0.size()-1]);
-		//ind = [1;ind;len0];
-		ind.insert(ind.begin(), 1);
-		ind.insert(ind.end(), len0);
-		minMagIdx = distance(x.begin(), std::min_element(x.begin(), x.end()));
-		minMag = x[minMagIdx];		
-		//std::cout<<"Hola"<<std::endl;
-		leftMin = minMag;
-	}
-	else
-	{
-		selectElementsFromIndices(x0, ind, x);
-		if(x.size()>2)
-		{
-			minMagIdx = distance(x.begin(), std::min_element(x.begin(), x.end()));		
-			minMag = x[minMagIdx];				
-			leftMin = x[0]<x0[0]?x[0]:x0[0];
-		}
-	}
-
-	int len = x.size();
-
-	if(len>2)
-	{
-		float tempMag = minMag;
-    	bool foundPeak = false;
-    	int ii;
-
-		if(includeEndpoints)
-		{
-    		// Deal with first point a little differently since tacked it on
-        	// Calculate the sign of the derivative since we tacked the first
-        	//  point on it does not neccessarily alternate like the rest.
-    		std::vector<float> xSub0(x.begin(), x.begin()+3);//tener cuidado subvector
-    		std::vector<float> xDiff;//tener cuidado subvector
-    		diff(xSub0, xDiff);
-
-    		std::vector<int> signDx;
-    		signVector(xDiff, signDx);
-
-        	if (signDx[0] <= 0) // The first point is larger or equal to the second
-        	{
-				if (signDx[0] == signDx[1]) // Want alternating signs
-				{
-					x.erase(x.begin()+1);
-					ind.erase(ind.begin()+1);
-					len = len-1;
-				}
-        	}
-        	else // First point is smaller than the second
-        	{
-				if (signDx[0] == signDx[1]) // Want alternating signs
-				{
-					x.erase(x.begin());
-					ind.erase(ind.begin());
-					len = len-1;
-				}
-        	}
-		}
-
-		//Skip the first point if it is smaller so we always start on maxima
-		if ( x[0] >= x[1] )
-			ii = 0;
-		else
-			ii = 1;
-
-		//Preallocate max number of maxima
-		float maxPeaks = ceil((float)len/2.0);
-		std::vector<int> peakLoc(maxPeaks,0);
-		std::vector<float> peakMag(maxPeaks,0.0);
-		int cInd = 1;
-		int tempLoc;		
-    
-    	while(ii < len)
-    	{
-        	ii = ii+1;//This is a peak
-        	//Reset peak finding if we had a peak and the next peak is bigger
-        	//than the last or the left min was small enough to reset.
-        	if(foundPeak)
-        	{
-            	tempMag = minMag;
-            	foundPeak = false;
-            }
-        
-        	//Found new peak that was lager than temp mag and selectivity larger
-        	//than the minimum to its left.
-        
-        	if( x[ii-1] > tempMag && x[ii-1] > leftMin + sel )
-        	{
-            	tempLoc = ii-1;
-            	tempMag = x[ii-1];
-        	}
-
-        	//Make sure we don't iterate past the length of our vector
-        	if(ii == len)
-            	break; //We assign the last point differently out of the loop
-
-        	ii = ii+1; // Move onto the valley
-        	
-        	//Come down at least sel from peak
-        	if(!foundPeak && tempMag > sel + x[ii-1])
-            {            	
-	            foundPeak = true; //We have found a peak
-	            leftMin = x[ii-1];
-	            peakLoc[cInd-1] = tempLoc; // Add peak to index
-	            peakMag[cInd-1] = tempMag;
-	            cInd = cInd+1;
-	        }
-        	else if(x[ii-1] < leftMin) // New left minima
-            	leftMin = x[ii-1];
-            
-        }
-
-		// Check end point
-		if(includeEndpoints)
-		{        
-			if ( x[x.size()-1] > tempMag && x[x.size()-1] > leftMin + sel )
-			{
-				peakLoc[cInd-1] = len-1;
-				peakMag[cInd-1] = x[x.size()-1];
-				cInd = cInd + 1;
-			}
-			else if( !foundPeak && tempMag > minMag )// Check if we still need to add the last point
-			{
-				peakLoc[cInd-1] = tempLoc;
-				peakMag[cInd-1] = tempMag;
-				cInd = cInd + 1;
-			}
-		}
-		else if(!foundPeak)
-		{
-			float minAux = x0[x0.size()-1]<x[x.size()-1]?x0[x0.size()-1]:x[x.size()-1];
-			if ( x[x.size()-1] > tempMag && x[x.size()-1] > leftMin + sel )
-			{
-				peakLoc[cInd-1] = len-1;
-				peakMag[cInd-1] = x[x.size()-1];
-				cInd = cInd + 1;
-			}
-			else if( !tempMag >  minAux + sel)// Check if we still need to add the last point
-			{
-				peakLoc[cInd-1] = tempLoc;
-				peakMag[cInd-1] = tempMag;
-				cInd = cInd + 1;
-			}
-		}
-
-		//Create output
-    	if( cInd > 0 )
-    	{        	
-        	std::vector<int> peakLocTmp(peakLoc.begin(), peakLoc.begin()+cInd-1);
-			selectElementsFromIndices(ind, peakLocTmp, peakInds);        	
-        }		
-
-	}
-	//else
-	//{
-		//input signal length <= 2
-	//}
-}*/
-
 //My implementation
 int PeakFinder::findPeaks(std::vector<float> x0, std::vector<int>& peakInds, bool includeEndpoints, int threshold) //old version returning only number of peaks
 {
@@ -396,4 +147,572 @@ int PeakFinder::findPeaksSmoothed(std::vector<float> x0, std::vector<float> mean
 		}
 	}	
 	return numPeaks;
+}
+
+double PeakFinder::IntegrateMuonPeak(int signStart, int signEnd, vector<float> datamV) { //Calculate integral in range
+	double integral = 0.;
+	
+	for (int i = signStart; i < signEnd; i++) { //Compute integra with trapezoid method
+		//Trapzoid area: 0.5*(B+b)*h -> in our 
+
+		//y                 //In our case the base (on x axys) is always 1 -> because of the sampling rate (1024 samples @ 1 Gs/s)
+		//|                 //The two bases are two conseutive values of the points y[i] and y[i+1]
+		//|	      /|y[i+1]  // In order to calculate the integral I su over all these contributions
+		//|  y[i]| | 
+		//|    b | | B
+		//|______|_|_____x
+		//        h
+
+		integral += (datamV[i+1] + datamV[i]);
+	}
+
+	return (0.5*integral)/50; //due to the trapezoid rule, I have to sum ((b+B)*h)/2 -> it's the same as dividing the final sum by 0.5 and h = 1
+	//Divided by 50 due to the fact that we read the signal on a 50 ohm resistor and also Q = I*t and I = V/R -> Q = (V/R)*t in the integral 
+	//pC unit of measure
+}
+
+bool IsGreaterThanOne (int i) {
+        return (i >= 1);
+}
+
+//Go through the datamV vector
+
+//This function is called everytime a peak is found
+//double PeakFinder::FindIntegrationInterval(double avgNoise, int signalLength, int muonStart, vector<float> datamV) {
+double PeakFinder::FindIntegrationInterval(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV) {
+	//avgNoise = noise before the peak (5*rms)
+	//muonStart = start of muon window, signalLength = 1024 (elements per event)
+	//Logic: calulcate integral from the first point where signal/noise > 1 until the las point where this is true
+	//For muons we keep a smaller window, usually the signals are around 150-250 ns
+	//If signal is short (order of 20 ns) -> we need to implement something else, if the signal is longer this method is quite ok
+	int signStart = 0, signEnd = 0; //Start and end of signal/noise > 1
+	float signBefore = 0, signAfter = 0; //Keeps track of the ratio of values in order to get the proper integration interval
+
+	//Calculate signal/noise ratio -> absolute value because signals can be negative as well
+	vector<float> signalToNoise;
+	signalToNoise.reserve(1024);
+
+	for (int i = 0; i < signalLength; i++) {
+		signalToNoise.push_back(TMath::Abs(datamV[i]/avgNoise)); 
+	}
+
+    cout << endl << "Event # " << event << " stip " << strip << endl;
+
+    vector<float>::iterator itFirst = find_if(signalToNoise.begin()+muonStart, signalToNoise.end(), IsGreaterThanOne); //Find iterator to first S/N > 1
+    cout << "The index of first element is: " << std::distance(signalToNoise.begin(), itFirst)   << '\n';
+    vector<float>::reverse_iterator itLast = find_if(signalToNoise.rbegin(), signalToNoise.rend(), IsGreaterThanOne); //Find iterator to last S/N > 1
+    cout << "The index of last element is: " << std::distance(itLast, signalToNoise.rend()) - 1  << '\n';
+    
+    //signStart = std::distance(signalToNoise.begin()+muonStart, itFirst);
+    signStart = std::distance(signalToNoise.begin(), itFirst);
+    signEnd = std::distance(itLast, signalToNoise.rend()) - 1;
+
+    cout << "Int start before " << signStart << " int end before " << signEnd << endl;
+
+    for (int i = signStart; i > 0; i--) { //Find true start of the signal
+    	signBefore = datamV[i]/datamV[i-1];
+    	cout << "signBefore " << signBefore << endl;
+    	if (signBefore >= 0) continue;
+    	else {
+    		//signStart = datamV[i];
+    		signStart = i;
+    		break;
+    	}
+    }
+
+    cout << "------------" << endl;
+
+    /*for (unsigned int i = signEnd; i < datamV.size()-1; i++) { //Find true end of the signal
+    	signAfter = datamV[i]/datamV[i+1];
+    	cout << "signAfter " << signAfter << endl;
+    	if (signAfter >= 0) continue;
+    	else {
+    		signEnd = i-1;
+    		break;
+    	}
+
+    }*/
+
+    signEnd = signStart + 200;
+
+    cout << "Int start after " << signStart << " int end after " << signEnd << endl;
+ 	cout << "Signal integral " << IntegrateMuonPeak(signStart,signEnd,datamV) << endl;	
+    return IntegrateMuonPeak(signStart,signEnd,datamV);
+}
+
+tuple<vector<int>,vector<int>,int,double> PeakFinder::FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV) {
+//pair<int,int> PeakFinder::FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV) {
+//pair<int,int> PeakFinder::FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV, vector<TLine*> &testMark) {
+
+	//avgNoise = noise before the first peak (5*rms)
+	//muonStart = start of muon window, signalLength = 1024 (elements per event)
+	//Logic: calulcate integral from the first point where signal/noise > 1 until the las point where this is true
+	//For muons we keep a smaller window, usually the signals are around 150-250 ns
+	//If signal is short (order of 20 ns) -> we need to implement something else, if the signal is longer this method is quite ok
+
+	bool mightBePeak = false, firstPeak = false, positivePeak = false, negativePeak = false, firstPeakDone = false, wasPeak = false;
+	bool rising = false, falling = false, printOut = false;
+	int peakStart = 0, peakEnd = 0, peakEndTemp = 0, peakStartTemp = 0, timeDiff = 0, timeDiffEndPeak = 0, timeDiffStartPeak = 0, peakNum = 1, trigStart = 680, trigEnd = 785;
+	double signBefore = 0, ratio = 0, signAfter = 0, avgPeaks = 0, sq_sum_gamma = 0, avgValue = 0.;
+	double m = 0, q = 0, intersectionStart = 0, intersectionEnd;
+	vector<int> peakValues, peakSign, inizioPicco, finePicco; 
+	vector<double> vIntStart, vIntEnd;
+	 
+	if(printOut) 
+		cout << "----" << endl;
+	if(printOut) 
+		cout << "Event # " << event << " strip " << strip << endl;
+	if(printOut) 
+		cout << "----" << endl;
+
+	if (printOut) cout << "+5 rms " << avgNoise << " -5 rms " << -avgNoise << endl;
+
+	avgValue = accumulate(&datamV[0],&datamV[muonStart],0.0)/muonStart; //average value of the waveform in noise window
+	if(printOut) cout << "Avg value " << avgValue << endl;
+
+	for (unsigned int i = 150; i < datamV.size(); i++) { //Go through the mV vector
+
+		//I distinguish in particular the first peak because with the algorithm I find the value where the signal crosses 5 sigma
+
+		// y
+		// |         *
+		// |        *  *
+		// |      |*|   |*|
+		// |------------------- 5 sigma
+		// |      *        *
+		// |     *          /*/**
+		// |*_*/*/_______________ x    |*| point found by the algorithm /*/ real start, reason why I distinguis the first peak and last peak
+
+		//----First peak----//
+		if (firstPeakDone == false) {
+
+			if (i > 1000) {
+				if (mightBePeak == true && positivePeak == true) {//Data is still above 5 sigma
+					peakEnd = 1000;
+					finePicco.push_back(peakEnd); //end of peak assumed to be at 1000 ns
+					vIntEnd.push_back(peakEnd); //end of time over threshold as well
+				}
+
+				else if (mightBePeak == true && negativePeak == true) {//Data is still below -5 sigma
+					peakEnd = 1000;
+					finePicco.push_back(peakEnd); //end of peak assumed to be at 1000 ns
+					vIntEnd.push_back(peakEnd); //end of time over threshold as well
+				}
+
+				else if (mightBePeak == false) //Data is not above 5 sigma or below -5 sigma
+					peakEnd=peakEndTemp;
+			break;
+			}
+
+			else if (datamV[i] > avgNoise && firstPeak == false && mightBePeak == false) { //Positive peak
+				mightBePeak = true;
+				positivePeak = true;
+				firstPeak = true;
+				if (printOut) cout << "First point over 5rms " << i << endl;
+				//Calculate time over threshold starting point
+						//----//
+				m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+				q = datamV[i]-m*i;
+				intersectionStart = (avgNoise-q)/m;
+				cout << "Intersection " << intersectionStart << endl;
+				vIntStart.push_back(intersectionStart);
+						//----//
+				for (int j = i; j > muonStart; j--) { //Calculate derivative to find real signal start
+					signBefore = (datamV[j]-datamV[j-1])/(j-(j-1));
+			    	if (printOut) cout << "Point " << j << " signBefore " << signBefore << endl;
+			    	if (signBefore >= 0) continue;
+	    			else {
+	    				peakStart = j;
+	    				break;
+	    			}
+				}
+				if (printOut) cout << "First real point for first peak " << peakStart << endl;
+				inizioPicco.push_back(peakStart);
+				continue;
+			}
+
+			else if (datamV[i] < -avgNoise && firstPeak == false && mightBePeak == false) { //Negative peak
+				mightBePeak = true;
+				negativePeak = true;
+				firstPeak = true;
+				if (printOut) cout << "First point below -5rms " << i << endl;
+				//Calculate time over threshold starting point
+						//----//
+				m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+				q = datamV[i]-m*i;
+				intersectionStart = (-avgNoise-q)/m;
+				cout << "Intersection " << intersectionStart << endl;
+				vIntStart.push_back(intersectionStart);
+						//----//
+				for (int j = i; j > muonStart; j--) { //Calculate derivative to find real signal start
+					signBefore = (datamV[j]-datamV[j-1])/(j-(j-1));
+			    	if (printOut) cout << "Point " << j << " signBefore " << signBefore << endl;
+			    	if (signBefore >= 0) continue;
+	    			else {
+	    				peakStart = j;
+	    				break;
+	    			}
+				}
+				if (printOut) cout << "First real point for first peak " << peakStart << endl;
+				inizioPicco.push_back(peakStart);
+				continue;
+			}
+
+			//----End of first peak----//
+			else if (datamV[i] < avgNoise && firstPeak == true && mightBePeak == true && positivePeak == true) { //Positive
+				peakSign.push_back(1);
+				positivePeak = false;
+				mightBePeak = false;
+				firstPeakDone = true;
+				//Calculate time over threshold ending point
+						//----//
+				m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+				q = datamV[i]-m*i;
+				intersectionEnd = (avgNoise-q)/m;
+				cout << "Intersection " << intersectionEnd << endl;
+				vIntEnd.push_back(intersectionEnd);
+						//----//
+				for (int j = i; j < datamV.size(); j++) { //calculate derivative to find real peak end
+					signAfter = (datamV[j+1]-datamV[j])/(j+1-j);
+					if (printOut) cout << "Point " << j << "signAfter " << signAfter << endl;
+					if (signAfter <= 0) continue;
+					else {
+						peakEndTemp = j;
+						break;
+					}  
+				}
+				peakValues.push_back(std::distance(&datamV[0],max_element(&datamV[peakStart],&datamV[peakEndTemp])));
+				if (printOut) cout << "End of the first positive peak " << peakEndTemp << endl;
+				if (printOut) cout << "Positive first peak value " << *max_element(&datamV[peakStartTemp],&datamV[peakEndTemp]) << endl;
+				finePicco.push_back(peakEndTemp);
+				continue;
+			}
+
+			else if (datamV[i] > -avgNoise && firstPeak == true && mightBePeak == true && negativePeak == true) { //Negative
+				peakSign.push_back(-1);
+				negativePeak = false;
+				mightBePeak = false;
+				firstPeakDone = true;
+				//Calculate time over threshold ending point
+						//----//
+				m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+				q = datamV[i]-m*i;
+				intersectionEnd = (-avgNoise-q)/m;
+				cout << "Intersection " << intersectionEnd << endl;
+				vIntEnd.push_back(intersectionEnd);
+						//----//
+				for (int j = i; j < datamV.size(); j++) { //calculate derivative to find real peak end
+					signAfter = (datamV[j+1]-datamV[j])/(j+1-j);
+					if (printOut) cout << "Point " << j << "signAfter " << signAfter << endl;
+					if (signAfter >= 0) continue;
+					else {
+						peakEndTemp = j;
+						break;
+					}  
+				}
+				peakValues.push_back(std::distance(&datamV[0],min_element(&datamV[peakStart],&datamV[peakEndTemp])));
+				if (printOut) cout << "End of the first negative peak " << peakEndTemp << endl;
+				if (printOut) cout << "Negative first peak value " << *min_element(&datamV[peakStartTemp],&datamV[peakEndTemp]) << endl;
+				finePicco.push_back(peakEndTemp);
+				continue;
+			}
+		}
+
+		//-----Analysis of following peaks----//
+		else if (firstPeakDone == true) {
+
+			if (i > 1000) {
+				if (mightBePeak == true && positivePeak == true) {//Data is still above 5 sigma
+					peakEnd = 1000;
+					finePicco.push_back(peakEndTemp);
+					vIntEnd.push_back(peakEndTemp);
+				}
+
+				else if (mightBePeak == true && negativePeak == true) {//Data is still below -5 sigma
+					peakEnd = 1000;
+					finePicco.push_back(peakEndTemp);
+					vIntEnd.push_back(peakEndTemp);
+				}
+
+				else if (mightBePeak == false) //Data is not above 5 sigma or below -5 sigma
+					peakEnd=peakEndTemp;
+			break;
+			}
+
+			else if (i >= trigStart && i <= trigEnd) {
+				if (printOut) cout << "I'm in the trigger zone" << endl;
+				continue;
+			}
+
+			else if (datamV[i] > avgNoise && firstPeak == true && mightBePeak == false) { //Positive
+				peakStartTemp= i-1;
+				mightBePeak = true;
+				positivePeak = true;
+				if (printOut) cout << "Positive peak start " << i << endl;
+				//Calculate time over threshold starting point
+						//----//
+				m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+				q = datamV[i]-m*i;
+				intersectionStart = (avgNoise-q)/m;
+				cout << "Intersection " << intersectionStart << endl;
+				vIntStart.push_back(intersectionStart);
+						//----//
+				inizioPicco.push_back(peakStartTemp);
+				continue;
+			}
+
+			else if (datamV[i] < -avgNoise && firstPeak == true && mightBePeak == false) { //Negative
+				peakStartTemp = i-1;
+				mightBePeak = true;
+				negativePeak = true;
+				if (printOut) cout << "Negative peak start " << i << endl;
+				//Calculate time over threshold starting point
+						//----//
+				m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+				q = datamV[i]-m*i;
+				intersectionStart = (-avgNoise-q)/m;
+				cout << "Intersection " << intersectionStart << endl;
+				vIntStart.push_back(intersectionStart);
+						//----//
+				inizioPicco.push_back(peakStartTemp);
+				continue;
+			}
+		
+			//-----End of following peaks----//
+			else if (datamV[i] < avgNoise && firstPeak == true && mightBePeak == true && positivePeak == true) { //End of positive peak
+				peakEndTemp = i;
+				if ((peakEndTemp - peakStartTemp) > 4) { //At least three points in the peak -> push back the peak
+					peakValues.push_back(std::distance(&datamV[0],max_element(&datamV[peakStartTemp],&datamV[peakEndTemp])));
+					peakSign.push_back(1);
+					mightBePeak = false;
+					positivePeak = false;
+					//Calculate time over threshold ending point
+						//----//
+					m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+					q = datamV[i]-m*i;
+					intersectionEnd = (avgNoise-q)/m;
+					cout << "Intersection " << intersectionEnd << endl;
+					vIntEnd.push_back(intersectionEnd);
+						//----//
+					if (printOut) cout << "Positive peak end " << i << endl;
+					if (printOut) cout << "Positive peak value " << *max_element(&datamV[peakStartTemp],&datamV[peakEndTemp]) << endl;
+					finePicco.push_back(peakEndTemp);
+					continue;
+				}
+				else if ((peakEndTemp - peakStartTemp) <= 4) { //Not a peak -> Delete last value in peak start and peak value 
+					mightBePeak = false;
+					positivePeak = false;
+					inizioPicco.pop_back();
+					vIntStart.pop_back();
+					peakEndTemp = finePicco.back();
+					if (printOut) cout << "Positive peak too short -> deleted" << endl;
+					continue;
+				}
+			}
+
+			else if (datamV[i] > -avgNoise && firstPeak == true && mightBePeak == true && negativePeak == true) { //Negative
+				peakEndTemp = i;
+				if ((peakEndTemp - peakStartTemp) > 4) { //At least three points in the peak -> push back the peak
+					peakValues.push_back(std::distance(&datamV[0],min_element(&datamV[peakStartTemp],&datamV[peakEndTemp])));
+					peakSign.push_back(-1);
+					mightBePeak = false;
+					negativePeak = false;
+					//Calculate time over threshold ending point
+						//----//
+					m = (datamV[i]-datamV[i-1])/(i-(i-1)); //Slope of line
+					q = datamV[i]-m*i;
+					intersectionEnd = (-avgNoise-q)/m;
+					cout << "Intersection " << intersectionEnd << endl;
+					vIntEnd.push_back(intersectionEnd);
+						//----//
+					if (printOut) cout << "Negative peak end " << i << endl;
+					if (printOut) cout << "Negative peak value " << *min_element(&datamV[peakStartTemp],&datamV[peakEndTemp]) << endl;
+					finePicco.push_back(peakEndTemp);
+					continue;
+				}
+				else if ((peakEndTemp - peakStartTemp) <= 4) { //Not a peak -> Delete last value in peak start and peak value 
+					mightBePeak = false;
+					negativePeak = false;
+					inizioPicco.pop_back();
+					vIntStart.pop_back();
+					//vIntEnd.pop_back();
+					peakEndTemp = finePicco.back();
+					if (printOut) cout << "Negative peak too short -> deleted" << endl;
+				}
+			}
+		}
+	}
+
+	if (printOut) cout << "Done with integration interval search....start is: " << peakStart << " peak end is: " << peakEnd << endl; 
+	if (printOut) cout << "There are " << peakValues.size() << " # of peaks and their values are" << endl;
+	if (printOut) cout << "Inizio picco size " << inizioPicco.size() << " fine picco size " << finePicco.size() << endl;
+	if (printOut) {
+		for (unsigned int i = 0; i < peakValues.size(); i++) {
+			cout << "Start " << inizioPicco[i] << " peak " << peakValues[i] << " end " << finePicco[i] << " and it is " << peakSign[i] << endl;
+			//testMark.push_back(new TLine(peakValues[i],-20,peakValues[i],20));
+		}
+	}
+
+	if(printOut) cout << "peakValues size " << peakValues.size() << endl;
+
+	for (unsigned int i = 0; i < peakValues.size(); i++) { //compute difference between peaks to check if it's a ripple or two distinct peaks
+		
+		if (peakValues[i] == peakValues.back() && peakValues.size() > 1) { //last point of the vector, we must be more careful
+			if(printOut) cout << "Peak number i " << i << endl;
+			if(printOut) cout << "Peak value i " << peakValues[i] << endl;
+			if(printOut) cout << "Sign of peak i " << peakSign[i] << endl;
+			if(printOut) cout << "i-1 " << i-1 << endl;
+			timeDiff = peakValues[i] - peakValues[i-1];
+			timeDiffEndPeak = peakValues[i] - finePicco[i-1];
+			timeDiffStartPeak = inizioPicco[i] - finePicco[i-1];
+			avgPeaks = accumulate(&datamV.at(peakValues[i]-10), &datamV.at(peakValues[i]+10) , 0.0)/(20);
+		}
+
+		else if (peakValues[i] == peakValues.back() && peakValues.size() == 1) {
+			if(printOut) cout << "Size of peak size 1 " << peakValues.size() << endl;
+			if(printOut) cout << "Peak number i " << i << endl;
+			if(printOut) cout << "Peak value i " << peakValues[i] << endl;
+			if(printOut) cout << "Sign of peak i " << peakSign[i] << endl;
+			break;
+		}
+
+		else {
+			if(printOut) cout << "Peak number i " << i << endl;
+			if(printOut) cout << "Peak value i " << peakValues[i] << endl;
+			if(printOut) cout << "Sign of peak i " << peakSign[i] << endl;
+			if(printOut) cout << "Peak number i+1 " << i+1 << endl;
+			if(printOut) cout << "Peak value i+1 " << peakValues[i+1] << endl;
+			if(printOut) cout << "Sign of peak i+1 " << peakSign[i+1] << endl;
+			timeDiff = peakValues[i+1] - peakValues[i]; //Time difference between peaks
+			timeDiffEndPeak = peakValues[i+1] - finePicco[i]; //Time difference from last point above threhsold and current peak
+			timeDiffStartPeak = inizioPicco[i+1] - finePicco[i];
+			avgPeaks = accumulate(&datamV.at(peakValues[i+1]-10), &datamV.at(peakValues[i+1]+10) , 0.0)/(20);
+		}
+
+		if ((peakSign[i] == 1 && peakSign[i+1] == 1) || (peakSign[i] == -1 && peakSign[i+1] == -1))  {//Both are positive or negative
+			if(printOut) cout << "Time Diff " << timeDiff << endl;
+			if(printOut) cout << "Time Diff End Peak " << timeDiffEndPeak << endl;
+			if(printOut) cout << "Time Diff Start Peak " << timeDiffStartPeak << endl;
+
+			if (timeDiff <= 40 || timeDiffEndPeak <= 40 || timeDiffStartPeak <= 40) { //Two same sign peaks with time difference <= 40 ns
+				if (printOut) cout << "Two same sign peaks with time difference <= 40 ns" << endl;
+				continue;
+			}
+
+			else { //Two same sign peaks with time difference > 40 ns
+				if (avgPeaks >= 9*avgValue || avgPeaks <= -9*avgValue) {
+					if (printOut) cout << "Peak that is > 40 ns and above noise " << peakValues[i+1] << endl;
+					if (printOut) cout << "Time difference > 40 ns but average above noise, hence not really peaks";
+
+					if (peakValues[i+1] == peakValues.back()) {
+						inizioPicco.pop_back();
+						finePicco.pop_back();
+						peakValues.pop_back();
+						peakSign.pop_back();
+						vIntStart.pop_back();
+						vIntEnd.pop_back();
+					}
+					
+					else {
+						inizioPicco.erase(inizioPicco.begin()+i+1); //Delete start of peak
+						finePicco.erase(finePicco.begin()+i+1); //Delete end of peak
+						peakValues.erase(peakValues.begin()+i+1); //Delete peak value
+						vIntStart.erase(vIntStart.begin()+i+1); //Delete start of ToT
+						vIntEnd.erase(vIntEnd.begin()+i+1); //Delete end of ToT
+						if (printOut) cout << "Peak after deletion " << peakValues[i+1] << "\t" << peakValues[i] << endl;
+						i--;
+					}
+					if(printOut) cout << "-> peak deleted" << endl;
+					continue;
+				}
+
+				else { //Time difference 
+					peakNum++;
+					if (printOut) cout << "Same sign peaks with time difference > 40 ns " << endl;
+					continue;
+				}
+			}
+		}
+
+		else if ((peakSign[i] == 1 && peakSign[i+1] == -1) || (peakSign[i] == -1 && peakSign[i+1] == 1))  {//One is positive and the other is negative or vice-versa
+			if(printOut) cout << "Time Diff " << timeDiff << endl;
+			if(printOut) cout << "Time Diff End Peak " << timeDiffEndPeak << endl;
+			if(printOut) cout << "Time Diff Start Peak " << timeDiffStartPeak << endl;
+
+			if (timeDiff <= 40 || timeDiffEndPeak <= 40 || timeDiffStartPeak <= 40) { //Time difference < 40 ns 
+				if (printOut) cout << "Two different sign peaks with time difference <= 40 ns " << endl;
+				continue;
+			}
+
+			else {//Two different sign peaks with > 40 ns time difference
+				if (printOut) cout << "avgPeaks " << avgPeaks << endl;
+
+				if (avgPeaks >= 9*avgValue || avgPeaks <= -9*avgValue) {
+					if (printOut) cout << "Peak that is > 40 ns and above noise " << peakValues[i+1] << endl;
+					if (printOut) cout << "Time difference > 40 ns but average above noise, hence not really peaks";
+
+					if (peakValues[i+1] == peakValues.back()) {
+						inizioPicco.pop_back();
+						finePicco.pop_back();
+						peakValues.pop_back();
+						peakSign.pop_back();
+						vIntStart.pop_back();
+						vIntEnd.pop_back();
+					}
+				
+					else {
+						inizioPicco.erase(inizioPicco.begin()+i+1); //Delete start of peak
+						finePicco.erase(finePicco.begin()+i+1); //Delete end of peak
+						peakValues.erase(peakValues.begin()+i+1); //Delete peak value
+						vIntStart.erase(vIntStart.begin()+i+1); //Delete start of ToT
+						vIntEnd.erase(vIntEnd.begin()+i+1); //Delete end of ToT
+						if (printOut) cout << "Peak after deletion " << peakValues[i+1] << "\t" << peakValues[i] << endl;
+						i--;
+					}
+
+					if(printOut) cout << "-> peak deleted" << endl;
+					continue;
+				}
+
+				else {
+					peakNum++;
+					if (printOut) cout << "Two different sign peaks with time difference > 40 ns " << endl;
+					continue;
+				}
+			}
+		}
+		//cout << "-------" << endl;
+	}
+
+	if (printOut) cout << "size init before " << inizioPicco.size() << " size end before " << finePicco.size() << endl;
+
+	for (unsigned int i = 0; i < inizioPicco.size(); i++) {
+		if (printOut) cout << "Start " << inizioPicco[i] << " picco " << peakValues[i] << " fine picco " << finePicco[i] << endl;
+		if (printOut) cout << i << endl;
+
+		if (finePicco[i] != finePicco.back()) {
+			if (peakValues[i+1] - peakValues[i] <= 40) {
+				finePicco.erase(finePicco.begin()+i);
+				inizioPicco.erase(inizioPicco.begin()+i+1);
+			}
+		}
+		else 
+			break;
+	}
+
+	//Calculate Time Over Threshold by summing the different ToTs if a signal has ripples;
+	if (printOut) cout << "size init after " << inizioPicco.size() << " size end after " << finePicco.size() << endl;
+	if (printOut) cout << "size ToT after " << vIntStart.size() << " size ToT after " << vIntEnd.size() << endl;
+
+	double ToT = 0;
+	for (unsigned int i = 0; i < vIntStart.size(); i++) {
+		ToT += (vIntEnd[i] - vIntStart[i]);
+	}	
+
+	cout << "Time over thrsehold " << ToT << endl;
+
+	//cout << "Inizio picco size dopo processsamento " << inizioPicco.size() << "\t" << "fine picco size dopo processamento " << finePicco.size() << endl;
+	if(peakNum > 1) cout << "Event " << event << " strip " << strip << " number of real peaks " << peakNum << endl;
+	//cout << "Event " << event << " strip " << strip << " number of real peaks " << peakNum << endl;
+	return make_tuple(inizioPicco,finePicco,peakNum,ToT);
 }

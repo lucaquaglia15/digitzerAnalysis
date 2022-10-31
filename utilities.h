@@ -16,6 +16,7 @@
 #include "TLine.h"
 #include "TMultiGraph.h"
 #include "TMarker.h"
+#include "TPaveText.h"
 #include <stdlib.h>
 #include <fstream>
 #include <numeric>
@@ -23,6 +24,7 @@
 #include <array>
 #include <algorithm>
 #include <string> 
+#include <tuple>
 
 using namespace std;
 
@@ -54,10 +56,12 @@ void treeProducer(int numFiles, string folderPath, string trigFile, string waveF
 
 int hvCounter(string folderPath, string ext, bool verbose);
 
-vector <double> hvReader(string scanPath, int scan, int numfiles, bool verbose);
+//vector <double> hvReader(string scanPath, int scan, int numfiles, bool verbose);
+tuple<vector <double>,vector <double>,vector <double>,vector <double>,vector <double>,vector <double>> hvReader(string scanPath, int scan, int numfiles, bool verbose);
 
 //double analyzer(int numFiles, string folderPath, int hv, bool verbose, struct chamber1G, int muonMin, int muonMax, int noiseMin, int noiseMax); //1 Gs/s
-double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bool verbose, struct chamber1G, int muonMin, int muonMax, int noiseMin, int noiseMax); //1 Gs/s
+//double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bool verbose, struct chamber1G, int muonMin, int muonMax, int noiseMin, int noiseMax); //1 Gs/s
+tuple<double,double,double,double,double,double,double,double,double,double,double,double,double,double,double,double> analyzer(vector<float> times, int numFiles, string folderPath, int hv, bool verbose, struct chamber1G, int muonMin, int muonMax, int noiseMin, int noiseMax); //1 Gs/s
 //double analyzer(int numFiles, string folderPath, int hv, bool verbose, struct chamber, int muonMin, int muonMax, int noiseMin, int noiseMax); //5 Gs/s
 
 

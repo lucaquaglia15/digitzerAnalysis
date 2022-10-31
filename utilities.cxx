@@ -125,12 +125,12 @@ int hvCounter(string folderPath, string ext, bool verbose) {
 //                    //
 //--------------------//
 
-//double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber1G rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { //1 Gs/s
-double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bool verbose, chamber1G rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { //1 Gs/s
+//double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bool verbose, chamber1G rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { //1 Gs/s
+tuple<double,double,double,double,double,double,double,double,double,double,double,double,double,double,double,double> analyzer(vector<float> times, int numFiles, string folderPath, int hv, bool verbose, chamber1G rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { //1 Gs/s
 //double analyzer(int numFiles, string folderPath, int hv, bool verbose, chamber rpc, int muonMin, int muonMax, int noiseMin, int noiseMax) { // 5 Gs/s
 
 	cout << endl << "Analyzing HV value: " << hv+1 << endl;
-	bool graphMakeMuon = true, graphMakeGamma = true;
+	bool graphMakeMuon = true, graphMakeGamma = false;
 
 	if (graphMakeMuon == true) cout << "Graph making is enabled for muons" << endl;
 	else cout << "Graph making is disabled for muons" << endl;
@@ -148,11 +148,18 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	float convFactor = amplitue/4096; //From ADC to mV
 	double threshold = 0.;//This will be used once we have the conversion between FEERIC threshold and actual mV
 	double clusTime = 15.; //Clustering time for muons and gammas, can be changed manually
+	int numberOfSigmas = 5, numPeaks = 0; //Number of rms considered as noise
+	tuple<vector<int>,vector<int>,int,double> startEnd;
+	vector<int> peakStart, peakEnd;
+	
+	bool test = true;
+	TH1D *testThr = new TH1D("testThr","testThr",20,-0.5,2.5); //Test histo to show the threshold value for muons
+	TH1D *testBaseline = new TH1D("testBaseline","testBaseline",20,0.,0.5); //Test histo to show the baseline value for muons
 
 	///////////
 	// Muons //
 	///////////
-	double meanNoise = 0., muonPeak = 0., sq_sum = 0, stdev = 0, rms = 0;
+	double meanNoise = 0., muonPeak = 0., sq_sum = 0, stdev = 0, rms = 0, totMuonCharge = 0, muonChargePerStrip = 0, muonToT = 0;
 	int eventsWitHit = 0, eventsWtihoutHit = 0, muonCounter = 0;
 	bool muonEff[7] = {false,false,false,false,false,false,false}; //strip by strip efficiency
 	bool isMuon = false, hasHitMuon = false;
@@ -167,11 +174,16 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	TH1F *muonProfile = new TH1F("muonProfile","muonProfile",7,0.5,7.5); //muon strip profile
 	TH1I *muonClusterMult = new TH1I("muonClusterMult","muonClusterMult",8,0.5,8.5); //muon cluster multiplicity
 	TH1F *muonClusterSize = new TH1F("muonClusterSize","muonClusterSize",8,0.5,8.5); //muon cluster size
+	TH1D *muonPromptCharge = new TH1D("muonPromptCharge","muonPromptCharge",2000,-0.5,200.5); //muon prompt charge
+	TH1D *hMuonToT[7]; //muon ToT per strip
+	for (int i = 0; i < 7; i++) {
+		hMuonToT[i] = new TH1D(("hMuonToT_"+to_string(i+1)).c_str(),("hMuonToT_"+to_string(i+1)).c_str(),1025,-0.5,1024.5);
+	}
 
 	////////////
 	// Gammas //
 	////////////
-	double meanNoiseGamma = 0., gammaPeak = 0., sq_sum_gamma = 0, stdevGamma = 0, rmsGamma = 0;
+	double meanNoiseGamma = 0., gammaPeak = 0., sq_sum_gamma = 0, stdevGamma = 0, rmsGamma = 0, totGammaCharge = 0;
 	int eventsWithGammaHit = 0, eventsWtihoutGammaHit = 0, gammaCounter = 0;
 	bool gammaEff[7] = {false,false,false,false,false,false,false};
 	bool isGamma = false, hasHitGamma = false;
@@ -187,10 +199,11 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	TH1F *gammaRateProfile = new TH1F("gammaRateProfile","gammaRateProfile",7,0.5,7.5); //gamma rate profile
 	TH1I *gammaClusterMult = new TH1I("gammaClusterMult","gammaClusterMult",8,0.5,8.5); //gamma cluster multiplicity
 	TH1F *gammaClusterSize = new TH1F("gammaClusterSize","gammaClusterSize",8,0.5,8.5); //gamma cluster size
-	
-	vector<float> tempMinValue, tempMaxValue;
-
-	//cout << samples << "\t" << freq << "\t" << amplitue << endl;
+	TH1D *gammaPromptCharge = new TH1D("gammaPromptCharge","gammaPromptCharge",2000,-0.5,200.5); //gamma prompt charge
+	TH1D *hGammaToT[7]; //gamma ToT per strip
+	for (int i = 0; i < 7; i++) {
+		hGammaToT[i] = new TH1D(("hGammaToT_"+to_string(i+1)).c_str(),("hGammaToT_"+to_string(i+1)).c_str(),1025,-0.5,1024.5);
+	}
 
 	//Open root file and get the tree inside
 	gSystem->cd(folderPath.c_str());
@@ -228,8 +241,6 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 		if (verbose) cout << "Setting branch address for: " << branchName << endl;
 	}
 
-	//cout << data[0]->size() << endl;
-
 	TCanvas *cStrip = new TCanvas(); //mV(time) for muons, eight per event
 	cStrip->cd();
 	cStrip->Divide(1,numFiles);
@@ -244,6 +255,7 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	TGraph *gStripGamma[numFiles];
 	TGraph *gStripGammaTot[numFiles];
 	TLine *noiseLine[numFiles];
+	TLine *minusNoiseLine[numFiles];
 	TMarker *peak[numFiles];
 
 	//Analyze the data
@@ -266,6 +278,7 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 		//cout << *min_element(data[0]->begin(), data[0]->end()) << endl;
 		//Check if the event is muon or gamma by looking at the trigger (on channel 0)
 		if (*min_element(data[0]->begin(), data[0]->end()) < 1000.) { //It's a muon - 1 Gs/s, if 5 Gs/s comment this line
+			//if (graphMakeMuon == false) continue;
 			muonCounter++;
 			isMuon = true;
 
@@ -288,6 +301,40 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 				rms = std::sqrt(sq_sum/(noiseMax - noiseMin));
 
 				if (verbose) cout << "Size " + to_string(i) << "\t" << data[j]->size() << endl;
+				if (test == true) {
+					testThr->Fill(5*rms);
+					testBaseline->Fill(accumulate(&datamV[j].at(noiseMin), &datamV[j].at(noiseMax), 0.0) / (noiseMax-noiseMin));
+				}
+
+				/*if (i == 805 && j == 4) { //Test integration range finder function
+					vector<TLine*> testMark; 
+					cout << "Event " << i << " strip " << j << endl;
+					cout << "Noise " << numberOfSigmas*rms << endl;
+					//startEnd = PeakFinder::FindIntegrationInterval2(i,j,numberOfSigmas*rms, 1024, muonMin, datamV[j], testMark);
+					startEnd = PeakFinder::FindIntegrationInterval2(i,j,numberOfSigmas*rms, 1024, muonMin, datamV[j]);
+					//cout << "Start in utilities " << startEnd.first << " and the end is " << startEnd.second << endl;
+					
+					peakStart = get<0>(startEnd);
+					peakEnd = get<1>(startEnd);
+					numPeaks = get<2>(startEnd);
+
+					cout << "numPeaks " << numPeaks << " size start " << peakStart.size() << " size end " << peakEnd.size() << endl;
+
+					TCanvas *cPart = new TCanvas();
+					cPart->cd();
+					gStrip[j] = new TGraph(samples,&times[0],&datamV[j][0]); //mV
+					gStrip[j]->SetMarkerColor(kRed);
+					gStrip[j]->SetLineColor(kRed);
+					gStrip[j]->SetTitle("");
+					gStrip[j]->Draw("APL");
+					noiseLine[j] = new TLine(0,numberOfSigmas*rms,1024,numberOfSigmas*rms); //mV
+					minusNoiseLine[j] = new TLine(0,-numberOfSigmas*rms,1024,-numberOfSigmas*rms);
+					noiseLine[j]->SetLineColor(kBlue);
+					minusNoiseLine[j]->SetLineColor(kBlue);
+					noiseLine[j]->Draw("SAME");
+					minusNoiseLine[j]->Draw("SAME");
+					for (int dd = 0; dd < testMark.size(); dd++) testMark[dd]->Draw("SAME");
+				}*/
 
 				if (graphMakeMuon) {
 					//gStrip[j] = new TGraph(data[j]->size(),&times[0],&data[j]->at(0)); //ADC counts
@@ -296,6 +343,7 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 					gStrip[j]->GetXaxis()->SetLabelSize(0.1);
 					gStrip[j]->GetXaxis()->SetTickSize(0.01);
 					gStrip[j]->GetYaxis()->SetNdivisions(510);
+					gStrip[j]->GetYaxis()->SetRangeUser(-20*rms,20*rms);
 					//gStrip[j]->GetYaxis()->SetTitle("Amplitude [a.u.]");
 					gStrip[j]->GetYaxis()->SetLabelSize(0.1);
 					gStrip[j]->GetYaxis()->SetTickSize(0.01);
@@ -305,10 +353,13 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 					gStrip[j]->SetTitle("");
 					cStrip->cd(j+1);
 					gStrip[j]->Draw("APL");
-					//noiseLine[j] = new TLine(times.front(),meanNoise + 5*stdev,times.back(),meanNoise + 5*stdev); //ADC counts
-					noiseLine[j] = new TLine(0,5*rms,1024,5*rms); //mV
-					noiseLine[j]->SetLineColor(kBlack);
+					//noiseLine[j] = new TLine(times.front(),meanNoise + numberOfSigmas*stdev,times.back(),meanNoise + numberOfSigmas*stdev); //ADC counts
+					noiseLine[j] = new TLine(0,numberOfSigmas*rms,1024,numberOfSigmas*rms); //mV
+					minusNoiseLine[j] = new TLine(0,-numberOfSigmas*rms,1024,-numberOfSigmas*rms);
+					noiseLine[j]->SetLineColor(kBlue);
+					minusNoiseLine[j]->SetLineColor(kBlue);
 					noiseLine[j]->Draw("SAME");
+					minusNoiseLine[j]->Draw("SAME");
 				}
 				
 				if (j == 0) { //Trigger event, simply draw it and continue						
@@ -318,7 +369,7 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 
 				if (verbose) {
 					//cout << "Event: \t" << i << "\t strip: \t" << j+1 << "\t muon pulse: \t" << muonPeak << "\t noise (with 5 sigma): \t" << meanNoise - 5*stdev << endl; //Negative pulse polarity
-					cout << "Event: \t" << i << "\t strip: \t" << j+1 << "\t muon pulse: \t" << muonPeak << "\t noise (with 5 sigma): \t" << meanNoise + 5*stdev << endl; //Positive pulse polarity
+					cout << "Event: \t" << i << "\t strip: \t" << j+1 << "\t muon pulse: \t" << muonPeak << "\t noise (with 5 sigma): \t" << meanNoise + numberOfSigmas*stdev << endl; //Positive pulse polarity
 				}
 
 				//Value corresponding to muon peak
@@ -328,59 +379,53 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 				muonPeak = *max_element(&datamV[j].at(muonMin), &datamV[j].at(muonMax)); //Max in muon window - Positive pule polarity - mV
 
 				//Was the chamber efficient?
-				//if (muonEff[j-1] == false && muonPeak <= (meanNoise - 5*stdev)) { //Negative pulse polarity - ADC counts
-				//if (muonEff[j-1] == false && muonPeak >= (meanNoise + 5*stdev)) { //Positive pulse polarity - ADC counts
+				//if (muonEff[j-1] == false && muonPeak <= (meanNoise - numberOfSigmas*stdev)) { //Negative pulse polarity - ADC counts
+				//if (muonEff[j-1] == false && muonPeak >= (meanNoise + numberOfSigmas*stdev)) { //Positive pulse polarity - ADC counts
 				//if (muonEff[j-1] == false && muonPeak <= threshold) { //FEERIC equivalent negative threshold - mV
 				//if (muonEff[j-1] == false && muonPeak >= threshold) { //FEERIC equivalent positive threshold - mV
-				//if (muonEff[j-1] == false && muonPeak <= 5*rms) { //Negative pulse polarity - mV
-				if (muonEff[j-1] == false && muonPeak >= 5*rms) { //Positive pulse polarity - mV
+				//if (muonEff[j-1] == false && muonPeak <= numberOfSigmas*rms) { //Negative pulse polarity - mV
+				if (muonEff[j-1] == false && muonPeak >= numberOfSigmas*rms) { //Positive pulse polarity - mV
+					startEnd = PeakFinder::FindIntegrationInterval2(i,j,numberOfSigmas*rms, 1024, muonMin, datamV[j]);
+					peakStart = get<0>(startEnd);
+					peakEnd = get<1>(startEnd);
+					numPeaks = get<2>(startEnd);
+					muonToT = get<3>(startEnd);
+
+					hMuonToT[j-1]->Fill(muonToT);
+					
+					cout << "numPeaks " << numPeaks << " size start " << peakStart.size() << " size end " << peakEnd.size() << endl;
 					muonEff[j-1] = true;
 					muonPeakPos.push_back(find(datamV[j].begin(),datamV[j].end(),muonPeak)-datamV[j].begin());
 					muonPeakValue.push_back(muonPeak);
-					if (verbose) cout << "Evento " << i << " strip " << j << " peak pos " << find(datamV[j].begin(),datamV[j].end(),muonPeak) - datamV[j].begin()  << endl;
+					if (verbose) cout << "Event " << i << " strip " << j << " peak pos " << find(datamV[j].begin(),datamV[j].end(),muonPeak) - datamV[j].begin()  << endl;
 					//muonPeakTimeAllStrips->Fill(find(datamV[j].begin(),datamV[j].end(),muonPeak)-datamV[j].begin());
 					//muonPeakTimePerStrip[j-1]->Fill(find(datamV[j].begin(),datamV[j].end(),muonPeak)-datamV[j].begin());
-					if (hasHitMuon == false) hasHitMuon = true;
+					if (hasHitMuon == false) {
+						hasHitMuon = true;
+						totMuonCharge = 0;
+						muonChargePerStrip = 0;
+					}
+					
+					for (int peak = 0; peak < peakStart.size(); peak++) {
+						//cout << "I'm here" << endl;
+						//cout << "Peak start " << peakStart[peak] << " peak end " << peakEnd[peak] << endl;
+						muonChargePerStrip += gStrip[j]->Integral(peakStart.at(peak),peakEnd.at(peak));
+						cout << "Muon charge per strip " << muonChargePerStrip << endl;
+					}
+					totMuonCharge += (muonChargePerStrip/50);				
 				}
-
+				
 				else { //not efficient
 					muonPeakPos.push_back(0); //push 0 if there is no muon, to have always 7 elements in the vector
 					muonPeakValue.push_back(0); //push 0 if there is no muon, to have always 7 elements in the vector
 				}
 
-				//Min and max values of each event in order to rescale y axis in graph
-				//tempMinValue.push_back(*min_element(&data[j]->front(), &data[j]->back()));
-				//tempMaxValue.push_back(*max_element(&data[j]->front(), &data[j]->back()));
-
-				if (verbose) {
-					cout << "MIN: " << *min_element(&data[j]->front(), &data[j]->back()) << endl;
-					cout << "MAX: " << *max_element(&data[j]->front(), &data[j]->back()) << endl;
-					cout << "size " << tempMinValue.size() << "\t" << tempMaxValue.size() << endl;
-				}
 				meanNoise = 0.;
 				muonPeak = 0.;
 				sq_sum = 0.;
 				stdev = 0.;	
 				datamV[j].clear(); //clear values in mV for next event, done strip by strip		
 			}
-
-			//float minValue = *min_element(&tempMinValue.front(), &tempMinValue.back());
-			//float maxValue = *max_element(&tempMaxValue.front(), &tempMaxValue.back());
-			
-			if (verbose) {
-				cout << "REAL min: " << *min_element(&tempMinValue.front(), &tempMinValue.back()) << endl;
-				cout << "REAL max: " << *max_element(&tempMaxValue.front(), &tempMaxValue.back()) << endl;
-			}
-
-			/*for (int i = 1; i < numFiles; i++) { //Graph cosmetics + memory clearance
-				//gStrip[i]->GetYaxis()->SetRangeUser(minValue-0.05*minValue,maxValue+0.05*maxValue);
-				gStrip[i]->GetYaxis()->SetRangeUser(minValue,maxValue);
-				cStrip->cd(i+1);
-				gStrip[i]->Draw("APL");
-				noiseLine[i]->Draw("SAME");
-			}
-			tempMinValue.clear();
-			tempMaxValue.clear();*/
 		} //End of muon event
 
 		/////////////////
@@ -398,7 +443,9 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 				sq_sum_gamma = 0;
 				stdevGamma = 0;
 
-				meanNoiseGamma = accumulate(&data[k]->at(noiseMin), &data[k]->at(noiseMax), 0.0) / (noiseMax-noiseMin);
+				//meanNoiseGamma = accumulate(&data[k]->at(noiseMin), &data[k]->at(noiseMax), 0.0) / (noiseMax-noiseMin);
+				meanNoiseGamma = accumulate(&data[k]->at(0), &data[k]->at(150), 0.0) / (150);
+
 				
 				for (unsigned int j = 0; j < samples; j++) {
 					datamV[k].push_back((data[k]->at(j)-meanNoiseGamma)*convFactor); //CONVERSION HERE
@@ -409,8 +456,12 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 				//stdevGamma = std::sqrt(sq_sum_gamma/(noiseMax-noiseMin) - meanNoiseGamma*meanNoiseGamma); //std dev in noise window
 				
 				//RMS (mV) -> Remember that inner_production function is [....) meaning that last element is not included in the calculation
-				sq_sum_gamma = inner_product(&datamV[k].at(noiseMin), &datamV[k].at(noiseMax), &datamV[k].at(noiseMin),0.0);
-				rmsGamma = std::sqrt(sq_sum_gamma/(noiseMax-noiseMin)); //RMS in noise window;
+				//sq_sum_gamma = inner_product(&datamV[k].at(noiseMin), &datamV[k].at(noiseMax), &datamV[k].at(noiseMin),0.0);
+				//rmsGamma = std::sqrt(sq_sum_gamma/(noiseMax-noiseMin)); //RMS in noise window;
+
+				sq_sum_gamma = inner_product(&datamV[k].at(0), &datamV[k].at(150), &datamV[k].at(0),0.0);
+				rmsGamma = std::sqrt(sq_sum_gamma/(150)); //RMS in noise window;
+
 
 				if (graphMakeGamma) {
 					//gStripGamma[k] = new TGraph(samples,&times[0],&data[k]->at(0)); //ADC counts
@@ -427,8 +478,8 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 					gStripGamma[k]->SetTitle("");
 					cStripGamma->cd(k+1);
 					gStripGamma[k]->Draw("APL");
-					//noiseLine[k] = new TLine(0,meanNoiseGamma + 5*stdevGamma,1024,meanNoiseGamma + 5*stdevGamma); //ADC counts
-					noiseLine[k] = new TLine(0,5*rmsGamma,1024,5*rmsGamma); //mV
+					//noiseLine[k] = new TLine(0,meanNoiseGamma + numberOfSigmas*stdevGamma,1024,meanNoiseGamma + numberOfSigmas*stdevGamma); //ADC counts
+					noiseLine[k] = new TLine(0,numberOfSigmas*rmsGamma,1024,numberOfSigmas*rmsGamma); //mV
 					noiseLine[k]->SetLineColor(kBlack);
 					noiseLine[k]->Draw("SAME");
 				}
@@ -446,13 +497,13 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 				//gammaPeak = *max_element(&data[k]->at(0), &data[k]->at(980)); //Max in window - Positive pule polarity - ADC counts
 
 				//Did the chamber see a gamma?
-				//if (gammaEff[k-1] == false && gammaPeak <= (meanNoiseGamma - 5*stdevGamma)) { //negative polarity - ADC counts
-				//if (gammaEff[k-1] == false && gammaPeak <= 5*rms) { //Negative pulse polarity - mV
-				if (gammaEff[k-1] == false && gammaPeak >= 5*rms) { //Positive pulse polarity - mV
+				//if (gammaEff[k-1] == false && gammaPeak <= (meanNoiseGamma - numberOfSigmas*stdevGamma)) { //negative polarity - ADC counts
+				//if (gammaEff[k-1] == false && gammaPeak <= numberOfSigmas*rms) { //Negative pulse polarity - mV
 				//if (gammaEff[k-1] == false && gammaPeak <= threshold) { //FEERIC equivalent negative threshold - mV
 				//if (gammaEff[k-1] == false && gammaPeak >= threshold) { //FEERIC equivalent positive threshold - mV
-				//if (gammaEff[k-1] == false && gammaPeak >= (meanNoiseGamma + 5*stdevGamma)) { //positive polarity - ADC counts
-					//cout << "Strip " << k << " max elem " << *max_element(data[k]->begin(), data[k]->end()) << " 5 sigma " << 5*stdevGamma << endl;
+				//if (gammaEff[k-1] == false && gammaPeak >= (meanNoiseGamma + numberOfSigmas*stdevGamma)) { //positive polarity - ADC counts
+				if (gammaEff[k-1] == false && gammaPeak > numberOfSigmas*rmsGamma) { //Positive pulse polarity - mV
+					//startEnd = PeakFinder::FindIntegrationInterval2(i,k,numberOfSigmas*rms, 1024, muonMin, datamV[k]);
 					if (hasHitGamma == false) hasHitGamma = true;
 					gammaEff[k-1] = true;
 					//peak[k] = new TMarker(max_element(&data[k]->at(0), &data[k]->at(980))-&data[k]->at(0),*max_element(&data[k]->at(0), &data[k]->at(980)),8);
@@ -486,6 +537,7 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 			isMuon = false;
 
 			if (hasHitMuon == true) { //at least one strip saw a muon
+				muonPromptCharge->Fill(totMuonCharge); //Fill charge histogram with sum of charges in all strips
 				hasHitMuon = false;
 				eventsWitHit++;
 				if (graphMakeMuon) {
@@ -747,20 +799,20 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 			if (i == 0 || i == 3) {
    				if (i == 0) {
    					cout << "Looking for common noise..." << endl;
-   					cout << "I found " << PeakFinder::findPeaks(gammaValues[i],noisePeakIndex,true,5) << " noise peaks" << endl;
+   					cout << "I found " << PeakFinder::findPeaks(gammaValues[i],noisePeakIndex,true,numberOfSigmas) << " noise peaks" << endl;
    				}
    				else {
-   					cout << "I found " << PeakFinder::findPeaks2(gammaValues[i],avgNoise,avg,peakIndex,true,5) << " gamma peaks" << endl; //old version
+   					cout << "I found " << PeakFinder::findPeaks2(gammaValues[i],avgNoise,avg,peakIndex,true,numberOfSigmas) << " gamma peaks" << endl; //old version
    					cout << "Noise size " << noisePeakIndex.size() << " peak size " << peakIndex.size() << endl;
    					cout << "Trying to smooth out the data for strip: " << i << "..." << endl;
 
-   					smoothData = sg_smooth(gammaValues[i],5,3);
+   					smoothData = sg_smooth(gammaValues[i],numberOfSigmas,3);
    					cout << "Original size " << gammaValues[i].size() << " new size " << smoothData.size() << endl;
 
    					cout << "Smoothing done" << endl;
    					cout << "Finding peaks in smoothed data..." << endl;
-   					cout << "I found " << PeakFinder::findPeaks(smoothData,smoothPeakIndex,true,5) << " peaks in smothed data (common noise NOT subracted)" << endl;;
-   					//cout << "I found " << PeakFinder::findPeaksSmoothed(smoothData,avgNoise,avg,smoothPeakIndex,true,5) << " peaks in smothed data (common noise NOT subracted)" << endl;;
+   					cout << "I found " << PeakFinder::findPeaks(smoothData,smoothPeakIndex,true,numberOfSigmas) << " peaks in smothed data (common noise NOT subracted)" << endl;;
+   					//cout << "I found " << PeakFinder::findPeaksSmoothed(smoothData,avgNoise,avg,smoothPeakIndex,true,numberOfSigmas) << " peaks in smothed data (common noise NOT subracted)" << endl;;
 
    					for (unsigned int kk = 0; kk < peakIndex.size(); kk++) {
    						//cout << "sono qui" << endl;
@@ -838,8 +890,10 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	gammaProfile->Draw("HISTO");
 
 	//Calculate gamma strip rate
+	double meanRate = 0, meanRatePart = 0, eMeanRate = 0, eMeanRatePart = 0;
 	for (int i = 0; i < 7; i++) {
 		gammaRateProfile->Fill(i+1,gammaProfile->GetBinContent(i+1)/(1E-9*gammaCounter*stripArea*980));
+		meanRatePart += gammaProfile->GetBinContent(i+1)/(1E-9*gammaCounter*stripArea*980);
 	}
 	TCanvas *cGammaRateProfile = new TCanvas();
 	cGammaRateProfile->cd();
@@ -847,34 +901,96 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	gammaRateProfile->GetYaxis()->SetTitle("Gammma rate [Hz/cm^{2}]");
 	gammaRateProfile->GetYaxis()->SetRangeUser(0,gammaRateProfile->GetMaximum()+(0.1*gammaRateProfile->GetMaximum()));
 	gammaRateProfile->Draw("HISTO");
+	meanRate = meanRatePart/7;
+
+	for (int i = 0; i < 7; i++) { //error on mean rate
+		eMeanRatePart += (gammaRateProfile->GetBinContent(i)-meanRate)*(gammaRateProfile->GetBinContent(i)-meanRate);
+	}
+	eMeanRate = TMath::Sqrt(eMeanRatePart)/7;
+
+	TPaveText *trate = new TPaveText(0.111051,0.913306,0.225894,0.960685,"NDC");
+	trate->AddText(Form("Gamma rate: %3.1lf +- %3.1lf HZ/cm^{2}",meanRate,eMeanRate));
+	trate->Draw("SAME");
 
 	//Muon cluster multiplicity
 	TCanvas *cMuonClusterMult = new TCanvas();
 	cMuonClusterMult->cd();
 	muonClusterMult->GetXaxis()->SetTitle("Muon CM");
-	muonClusterMult->GetXaxis()->SetTitle("Counts");
+	muonClusterMult->GetYaxis()->SetTitle("Counts");
 	muonClusterMult->Draw("HISTO");
 
 	//Muon cluster multiplicity
 	TCanvas *cMuonClusterSize = new TCanvas();
 	cMuonClusterSize->cd();
 	muonClusterSize->GetXaxis()->SetTitle("Muon CS [strips]");
-	muonClusterSize->GetXaxis()->SetTitle("Counts");
+	muonClusterSize->GetYaxis()->SetTitle("Counts");
 	muonClusterSize->Draw("HISTO");
 
 	//Gamma cluster multiplicity
 	TCanvas *cGammaClusterMult = new TCanvas();
 	cGammaClusterMult->cd();
 	gammaClusterMult->GetXaxis()->SetTitle("Gamma CM");
-	gammaClusterMult->GetXaxis()->SetTitle("Counts");
+	gammaClusterMult->GetYaxis()->SetTitle("Counts");
 	gammaClusterMult->Draw("HISTO");
 
 	//Gamma cluster size
 	TCanvas *cGammaClusterSize = new TCanvas();
 	cGammaClusterSize->cd();
 	gammaClusterSize->GetXaxis()->SetTitle("Gamma CS [strips]");
-	gammaClusterSize->GetXaxis()->SetTitle("Counts");
+	gammaClusterSize->GetYaxis()->SetTitle("Counts");
 	gammaClusterSize->Draw("HISTO");
+
+	//Muon prompt charge
+	TCanvas *cMuonPromptCharge = new TCanvas();
+	cMuonPromptCharge->cd();
+	muonPromptCharge->GetXaxis()->SetTitle("Muon prompt chagre [pC]");
+	muonPromptCharge->GetYaxis()->SetTitle("Counts");
+	muonPromptCharge->Draw("HISTO");
+
+	//Muon ToT
+	TCanvas *cMuonToT = new TCanvas();
+	cMuonToT->cd();
+	cMuonToT->Divide(2,4);
+	for (int i = 0; i < 7; i++) {
+		cMuonToT->cd(i+1);
+		hMuonToT[i]->GetXaxis()->SetTitle("Muon ToT [ns]");
+		hMuonToT[i]->GetYaxis()->SetTitle("Counts");
+		hMuonToT[i]->SetTitle(("Strip_"+to_string(i+1)).c_str());
+		hMuonToT[i]->Draw("HISTO");
+	}
+
+	//Gamma ToT
+	TCanvas *cGammaToT = new TCanvas();
+	cGammaToT->cd();
+	cGammaToT->Divide(2,4);
+	for (int i = 0; i < 7; i++) {
+		cGammaToT->cd(i+1);
+		hGammaToT[i]->GetXaxis()->SetTitle("Gamma ToT [ns]");
+		hGammaToT[i]->GetYaxis()->SetTitle("Counts");
+		hGammaToT[i]->SetTitle(("Strip_"+to_string(i+1)).c_str());
+		hGammaToT[i]->Draw("HISTO");
+	}
+
+	//Gamma prompt charge
+	TCanvas *cGammaPromptCharge = new TCanvas();
+	cGammaPromptCharge->cd();
+	gammaPromptCharge->GetXaxis()->SetTitle("Gamma prompt chagre [pC]");
+	gammaPromptCharge->GetYaxis()->SetTitle("Counts");
+	gammaPromptCharge->Draw("HISTO");
+
+	//Test histo to show RMS
+	TCanvas *cTestThr = new TCanvas();
+	cTestThr->cd();
+	testThr->GetXaxis()->SetTitle("Threshold [mV]");
+	testThr->GetYaxis()->SetTitle("Counts");
+	testThr->Draw("HISTO");
+
+	//Test histo to show baseline
+	TCanvas *cTestBaseline = new TCanvas();
+	cTestBaseline->cd();
+	testBaseline->GetXaxis()->SetTitle("Baseline [mV]");
+	testBaseline->GetYaxis()->SetTitle("Counts");
+	testBaseline->Draw("HISTO");
 
 	//Muon peak time (all strips)
 	/*TCanvas *cMuonPeakTime = new TCanvas();
@@ -908,31 +1024,61 @@ double analyzer(vector<float> times, int numFiles, string folderPath, int hv, bo
 	cGammaRateProfile->Write(("Gamma_rate_profile_hv_"+to_string(hv+1)).c_str());	
 	cGammaClusterMult->Write(("Gamma_clus_mult_hv_"+to_string(hv+1)).c_str());
 	cGammaClusterSize->Write(("Gamma_clus_size_hv_"+to_string(hv+1)).c_str());
+	cMuonPromptCharge->Write(("Muon_prompt_charge_hv_"+to_string(hv+1)).c_str());
+	cGammaPromptCharge->Write(("Gamma_prompt_charge_hv_"+to_string(hv+1)).c_str());
+	cMuonToT->Write(("Muon_ToT_hv_"+to_string(hv+1)).c_str());
+	cGammaToT->Write(("Gamma_ToT_hv_"+to_string(hv+1)).c_str());
 	fout->Close();
-
-	//Uncomment if full analysis is launched (i.e. more than 1 hv point)
-	//delete muonProfile;
-	//delete gammaProfile;
-	//delete gammaRateProfile;
-	//delete muonClusterMult;
-	//delete muonClusterSize;
-	//delete gammaClusterMult;
-	//delete gammaClusterSize;
 
 	cout << "Muon counter: " << muonCounter << " efficient events: " << eventsWitHit << " non efficient :" << eventsWtihoutHit << " efficiency: " << eventsWitHit/(double)muonCounter << endl;
 
-	return (eventsWitHit/(double)muonCounter)*100;
+	//return (eventsWitHit/(double)muonCounter)*100;
+	
+	double eff = (eventsWitHit/(double)muonCounter)*100; //muon efficiency
+	double eEff = TMath::Sqrt((eff*(100-eff))/muonCounter); //error on muon efficiency
+	double muonCS = muonClusterSize->GetMean(); //muon CS
+	double eMuonCS = muonClusterSize->GetMeanError(); //error on muon CS
+	double muonCM = muonClusterMult->GetMean();  //muon CM
+	double eMuonCM = muonClusterMult->GetMeanError(); //error on muon CM
+	double gammaCS= gammaClusterSize->GetMean(); //gamma CS
+	double eGammaCS = gammaClusterSize->GetMeanError(); //error on gamma CS
+	double gammaCM = gammaClusterMult->GetMean(); //gamma CM
+	double eGammaCM = gammaClusterMult->GetMeanError(); //erroro on gamma CM
+	double gammaRate = meanRate; //mean gamma rate
+	double eGammaRate = eMeanRate; //error on gamma rate
+	double meanMuChrge = muonPromptCharge->GetMean(); //mean muon prompt charge
+	double eMeanMucharge = 0; //error on muon prompt charge
+	double meanGammaCharge = gammaPromptCharge->GetMean(); //mean gamma prompt charge
+	double eMeanGammacharge = 0; //error on gamma prompt charge
+
+	//Uncomment if full analysis is launched (i.e. more than 1 hv point)
+	delete muonProfile;
+	delete gammaProfile;
+	delete gammaRateProfile;
+	delete muonClusterMult;
+	delete muonClusterSize;
+	delete gammaClusterMult;
+	delete gammaClusterSize;
+	delete muonPromptCharge;
+	delete gammaPromptCharge;
+	for (int i = 0; i< 7; i++) {
+		delete hMuonToT[i];
+		delete hGammaToT[i];
+	}
+
+	return make_tuple(eff,eEff,muonCS,eMuonCS,muonCM,eMuonCM,gammaCS,eGammaCS,gammaCM,eGammaCM,gammaRate,eGammaRate,meanMuChrge,eMeanMucharge,meanGammaCharge,eMeanGammacharge);
 }
 
-//--------------------//
-//                    //
-//   Get HV values    //
-//                    //
-//--------------------//
+//---------------------------//
+//                   		 //
+//    Get I and HV values    //
+//                           //
+//---------------------------//
 
-vector <double> hvReader(string scanFolder, int scan, int file_count, bool verbose) {
+//vector <double> hvReader(string scanFolder, int scan, int file_count, bool verbose) {
+tuple<vector<double>,vector<double>,vector<double>,vector<double>,vector<double>,vector<double>> hvReader(string scanFolder, int scan, int file_count, bool verbose) {
 
-	vector<double> hvEff;
+	vector<double> hvEff, eHVeff, iMon, eImon, hvMon, eHVmon;
 
 	gSystem->cd(scanFolder.c_str());
 
@@ -942,10 +1088,15 @@ vector <double> hvReader(string scanFolder, int scan, int file_count, bool verbo
 			TH1F *HVeff = (TH1F*)f->Get("HVeff_ALICE-2-0-GAP");
 			TH1F *HVmon = (TH1F*)f->Get("HVmon_ALICE-2-0-GAP");
 			TH1F *Imon = (TH1F*)f->Get("Imon_ALICE-2-0-GAP");
+			
 			hvEff.push_back(HVeff->GetMean());
-		
-		
+			eHVeff.push_back(HVeff->GetMeanError());
+			iMon.push_back(Imon->GetMean());
+			eImon.push_back(Imon->GetMeanError());
+			hvMon.push_back(HVmon->GetMean());
+			eHVmon.push_back(HVmon->GetMeanError());
 		//else hvEff.push_back(9500); //Specific for scan 243, hv point 8 .root file was produced
 	}
-	return hvEff;
+	//return hvEff;
+	return make_tuple(hvEff, eHVeff, iMon, eImon, hvMon, eHVmon);
 }

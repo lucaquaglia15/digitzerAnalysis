@@ -3,6 +3,10 @@
 #define PEAKFINDER_H
 
 #include <vector>
+#include <utility>
+#include <tuple>
+#include "TMath.h"
+#include "TLine.h"
 
 namespace PeakFinder {
     const float EPS = 2.2204e-16f;
@@ -20,7 +24,13 @@ namespace PeakFinder {
     int findPeaks(std::vector<float> x0, std::vector<int>& peakInds, bool includeEndpoints=true, int threshold=5);
     //auto findPeaks2(std::vector<float> x0, std::vector<int>& peakInds, bool includeEndpoints=true, int threshold=5);
     int findPeaksSmoothed(std::vector<float> x0, std::vector<float> meanNoise, std::vector<float> mean, std::vector<int>& peakInds, bool includeEndpoints=true, int threshold=5);
-
+    //double FindIntegrationInterval(double avgNoise, int signalLength, int muonStart, vector<float> datamV);
+    double FindIntegrationInterval(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV);
+    //double FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV);
+    //pair<int,int> FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV);
+    //pair<int,int> FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV, vector<TLine*> &testMark);
+    tuple<vector<int>,vector<int>,int,double> FindIntegrationInterval2(int event, int strip, double avgNoise, int signalLength, int muonStart, vector<float> datamV);
+    double IntegrateMuonPeak(int signStart, int signEnd, vector<float> datamV);
 }
 
 #endif
